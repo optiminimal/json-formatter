@@ -1,7 +1,7 @@
 /*!
  * jsonformatter
  * 
- * Version: 0.2.4 - 2014-11-09T23:45:47.694Z
+ * Version: 0.2.5 - 2014-11-24T14:38:36.762Z
  * License: MIT
  */
 
@@ -10,132 +10,149 @@
 
 angular.module('jsonFormatter', ['RecursionHelper'])
 .directive('jsonFormatter', ['RecursionHelper', function (RecursionHelper) {
-  function escapeString(str) {
-    return str.replace('"', '\"');
-  }
 
-  // From http://stackoverflow.com/a/332429
-  function getObjectName(object) {
-    if (object === undefined) {
-      return '';
-    }
-    if (object === null) {
-      return 'Object';
-    }
-    var funcNameRegex = /function (.{1,})\(/;
-    var results = (funcNameRegex).exec((object).constructor.toString());
-    if (results && results.length > 1) {
-      return results[1];
-    } else {
-      return '';
-    }
-  }
-
-  function link(scope, element, attributes) {
-    scope.isArray = function () {
-      return Array.isArray(scope.json);
-    };
-
-    scope.isObject = function() {
-      return scope.json && typeof scope.json === 'object';
-    };
-
-    scope.getKeys = function (){
-      if (scope.isObject()) {
-        return Object.keys(scope.json);
-      }
-    };
-    scope.type = typeof scope.json;
-    scope.hasKey = typeof scope.key !== 'undefined';
-    scope.getConstructorName = function(){
-      return getObjectName(scope.json);
-    };
-
-    // Set custom type for null
-    if (scope.json === null){
-      scope.type = 'null';
+    function escapeString(str) {
+        return str.replace('"', '\"');
     }
 
-    // Set custom type for null
-    if (scope.json === undefined){
-      scope.type = 'undefined';
+    // From http://stackoverflow.com/a/332429
+    function getObjectName(object) {
+        if (object === undefined) {
+            return '';
+        }
+        if (object === null) {
+            return 'Object';
+        }
+        var funcNameRegex = /function (.{1,})\(/;
+        var results = (funcNameRegex).exec((object).constructor.toString());
+        if (results && results.length > 1) {
+            return results[1];
+        } else {
+            return '';
+        }
     }
 
-    if (scope.type === 'string'){
+    function link(scope, element, attributes) {
+var parentJson = scope.json;
+if (scope.key) {
+    scope.json = scope.json[scope.key];
+}
+        scope.isArray = function () {
+            return Array.isArray(scope.json);
+        };
 
-      // Add custom type for date
-      if((new Date(scope.json)).toString() !== 'Invalid Date') {
-        scope.isDate = true;
-      }
 
-      // Add custom type for URLs
-      if (scope.json.indexOf('http') === 0) {
-        scope.isUrl = true;
-      }
+        scope.isObject = function() {
+            return scope.json && typeof scope.json === 'object';
+        };
+
+        scope.getKeys = function (){
+            if (scope.isObject()) {
+                return Object.keys(scope.json);
+            }
+        };
+        scope.type = typeof scope.json;
+        scope.hasKey = typeof scope.key !== 'undefined';
+        scope.getConstructorName = function(){
+            return getObjectName(scope.json);
+        };
+
+        // Set custom type for null
+        if (scope.json === null){
+            scope.type = 'null';
+        }
+
+        // Set custom type for null
+        if (scope.json === undefined){
+            scope.type = 'undefined';
+        }
+
+        if (scope.type === 'string'){
+
+            // Add custom type for date
+            if((new Date(scope.json)).toString() !== 'Invalid Date') {
+                scope.isDate = true;
+            }
+
+            // Add custom type for URLs
+            if (scope.json.indexOf('http') === 0) {
+                scope.isUrl = true;
+            }
+        }
+
+        scope.isEmptyObject = function () {
+            return scope.getKeys() && !scope.getKeys().length &&
+                scope.isOpen && !scope.isArray();
+        };
+
+        if (scope.key) {
+            var path = scope.path;
+
+            if (Array.isArray(parentJson)) {
+                scope.path =  path + '[' + scope.key+']';
+            } else {
+                scope.path =  (path ? path + '.' : '') + scope.key;
+            }
+        }
+
+        // If 'open' attribute is present
+        scope.isOpen = !!scope.open;
+        scope.toggleOpen = function () {
+            scope.actionFn()(scope.path);
+            scope.isOpen = !scope.isOpen;
+        };
+        scope.childrenOpen = function () {
+            if (scope.open > 1){
+                return scope.open - 1;
+            }
+            return 0;
+        };
+
+        scope.openLink = function (isUrl) {
+            if(isUrl) {
+                window.location.href = scope.json;
+            }
+        };
+
+        scope.parseValue = function (value){
+            if (scope.type === 'null') {
+                return 'null';
+            }
+            if (scope.type === 'undefined') {
+                return 'undefined';
+            }
+            if (scope.type === 'string') {
+                value = '"' + escapeString(value) + '"';
+            }
+            if (scope.type === 'function'){
+
+                // Remove content of the function
+                return scope.json.toString()
+                .replace(/\n/g, '')
+                .replace(/\{.+?\}/, '') + '{ ... }';
+
+            }
+            return value;
+        };
     }
 
-    scope.isEmptyObject = function () {
-      return scope.getKeys() && !scope.getKeys().length &&
-        scope.isOpen && !scope.isArray();
+    return {
+        templateUrl: 'json-formatter.html',
+        restrict: 'E',
+        replace: true,
+        scope: {
+            actionFn: '&',
+            path: '=',
+            json: '=',
+            key: '=',
+            open: '='
+        },
+        compile: function(element) {
+            // Use the compile function from the RecursionHelper,
+            // And return the linking function(s) which it returns
+            return RecursionHelper.compile(element, link);
+        }
     };
-
-
-    // If 'open' attribute is present
-    scope.isOpen = !!scope.open;
-    scope.toggleOpen = function () {
-      scope.isOpen = !scope.isOpen;
-    };
-    scope.childrenOpen = function () {
-      if (scope.open > 1){
-        return scope.open - 1;
-      }
-      return 0;
-    };
-
-    scope.openLink = function (isUrl) {
-      if(isUrl) {
-        window.location.href = scope.json;
-      }
-    };
-
-    scope.parseValue = function (value){
-      if (scope.type === 'null') {
-        return 'null';
-      }
-      if (scope.type === 'undefined') {
-        return 'undefined';
-      }
-      if (scope.type === 'string') {
-        value = '"' + escapeString(value) + '"';
-      }
-      if (scope.type === 'function'){
-
-        // Remove content of the function
-        return scope.json.toString()
-          .replace(/\n/g, '')
-          .replace(/\{.+?\}/, '') + '{ ... }';
-
-      }
-      return value;
-    };
-  }
-
-  return {
-    templateUrl: 'json-formatter.html',
-    restrict: 'E',
-    replace: true,
-    scope: {
-      json: '=',
-      key: '=',
-      open: '='
-    },
-    compile: function(element) {
-
-      // Use the compile function from the RecursionHelper,
-      // And return the linking function(s) which it returns
-      return RecursionHelper.compile(element, link);
-    }
-  };
 }]);
 
 'use strict';
@@ -184,4 +201,4 @@ angular.module('RecursionHelper', []).factory('RecursionHelper', ['$compile', fu
   };
 }]);
 
-angular.module("jsonFormatter").run(["$templateCache", function($templateCache) {$templateCache.put("json-formatter.html","<div ng-init=\"isOpen = open && open > 0\" class=\"json-formatter-row\"><a ng-click=\"toggleOpen()\"><span class=\"toggler {{isOpen ? \'open\' : \'\'}}\" ng-if=\"isObject()\"></span> <span class=\"key\" ng-if=\"hasKey\">{{key}}:</span> <span class=\"value\"><span ng-if=\"isObject()\"><span class=\"constructor-name\">{{getConstructorName(json)}}</span> <span ng-if=\"isArray()\"><span class=\"bracket\">[</span><span class=\"number\">{{json.length}}</span><span class=\"bracket\">]</span></span></span> <span ng-if=\"!isObject()\" ng-click=\"openLink(isUrl)\" class=\"{{type}}\" ng-class=\"{date: isDate, url: isUrl}\">{{parseValue(json)}}</span></span></a><div class=\"children\" ng-if=\"getKeys().length && isOpen\"><json-formatter ng-repeat=\"key in getKeys()\" json=\"json[key]\" key=\"key\" open=\"childrenOpen()\"></json-formatter></div><div class=\"children empty object\" ng-if=\"isEmptyObject()\"></div><div class=\"children empty array\" ng-if=\"getKeys() && !getKeys().length && isOpen && isArray()\"></div></div>");}]);
+angular.module("jsonFormatter").run(["$templateCache", function($templateCache) {$templateCache.put("json-formatter.html","<div ng-init=\"isOpen = open && open > 0\" class=\"json-formatter-row\"><a ng-click=\"toggleOpen()\"><span class=\"toggler {{isOpen ? \'open\' : \'\'}}\" ng-if=\"isObject()\"></span> <span class=\"key\" ng-if=\"hasKey\">{{key}}:</span> <span class=\"value\"><span ng-if=\"isObject()\"><span class=\"constructor-name\">{{getConstructorName(json)}}</span> <span ng-if=\"isArray()\"><span class=\"bracket\">[</span><span class=\"number\">{{json.length}}</span><span class=\"bracket\">]</span></span></span> <span ng-if=\"!isObject()\" ng-click=\"openLink(isUrl)\" class=\"{{type}}\" ng-class=\"{date: isDate, url: isUrl}\">{{parseValue(json)}}</span></span></a><div class=\"children\" ng-if=\"getKeys().length && isOpen\"><json-formatter ng-repeat=\"key in getKeys()\" action-fn=\"actionFn()\" json=\"json\" path=\"path\" key=\"key\" open=\"childrenOpen()\"></json-formatter></div><div class=\"children empty object\" ng-if=\"isEmptyObject()\"></div><div class=\"children empty array\" ng-if=\"getKeys() && !getKeys().length && isOpen && isArray()\"></div></div>");}]);

@@ -89,8 +89,10 @@ if (scope.key) {
 
         // If 'open' attribute is present
         scope.isOpen = !!scope.open;
-        scope.toggleOpen = function () {
-            scope.actionFn()(scope.path);
+        scope.toggleOpen = function (event) {
+            if (event.target.className.indexOf('toggler') === -1 && scope.actionFn()) {
+                scope.actionFn()(scope.path);
+            }
             scope.isOpen = !scope.isOpen;
         };
         scope.childrenOpen = function () {
